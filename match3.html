@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Match-3 Game by Gemini</title>
+    <style>
+        /* --- СТИЛІ CSS --- */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            background-color: #1e1e2d;
+            color: #e0e0f0;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #4CAF50;
+            margin-bottom: 10px;
+        }
+
+        .score-container {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #2a2a3e;
+            border-radius: 8px;
+            display: inline-block;
+        }
+
+        #game-grid {
+            display: grid;
+            /* Створюємо сітку 8x8 */
+            grid-template-columns: repeat(8, 60px);
+            grid-template-rows: repeat(8, 60px);
+            gap: 4px;
+            margin: 20px auto;
+            width: fit-content;
+            border: 5px solid #4CAF50;
+            background-color: #333;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
+        }
+
+        .gem {
+            width: 60px;
+            height: 60px;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: transform 0.2s ease-out, opacity 0.5s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            user-select: none;
+            box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
+            background-color: #444;
+        }
+
+        .gem[data-type="0"] { background-color: #ff6347; }
+        .gem[data-type="1"] { background-color: #4682b4; }
+        .gem[data-type="2"] { background-color: #3cb371; }
+        .gem[data-type="3"] { background-color: #ffd700; }
+        .gem[data-type="4"] { background-color: #9370db; }
+
+        .selected {
+            border: 4px solid #fff;
+            transform: scale(1.05);
+            box-shadow: 0 0 15px #fff;
+        }
+
+        .hidden {
+            opacity: 0;
+            transform: scale(0.1);
+        }
+    </style>
+</head>
+<body>
+    <h1>💎 Просте "Три в Ряд" 💎</h1>
+    <div class="score-container">
+        Рахунок: <span id="score">0</span>
+    </div>
+    <div id="game-grid" class="game-grid"></div>
+
+    <script>
+        const GRID_SIZE = 8;
+        const GEM_TYPES = 5;
+        const ICONS = ['🔥', '💧', '🌿', '⚡', '🌌'];
+        let board = [];
+        let score = 0;
+        let selectedGem = null;
+        let isProcessing = false;
+
+        const gridElement = document.getElementById('game-grid');
+        const scoreElement = document.getElementById('score');
+
+        function getRandomGem() {
+            return Math.floor(Math.random() * GEM_TYPES);
+        }
+
+        function createBoard() {
+            board = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    let type;
+                    do {
+                        type = getRandomGem();
+                    } while (
+                        (c >= 2 && board[r][c - 1] === type && board[r][c - 2] === type) ||
+                        (r >= 2 && board[r - 1][c] === type && board[r - 2][c] === type)
+                    );
+                    board[r][c] = type;
+                }
+            }
+        }
+
+        function drawBoard() {
+            gridElement.innerHTML = '';
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const gem = document.createElement('div');
+                    const type = board[r][c];
+                    gem.classList.add('gem');
+                    gem.dataset.row = r;
+                    gem.dataset.col = c;
+                    gem.dataset.type = type;
+                    gem.textContent = ICONS[type];
+                    gem.addEventListener('click', handleGemClick);
+                    gridElement.appendChild(gem);
+                }
+            }
+        }
+
+        function handleGemClick(event) {
+            if (isProcessing) return;
+            const clickedGem = event.target;
+            const r = parseInt(clickedGem.dataset.row);
+            const c = parseInt(clickedGem.dataset.col);
+            if (selectedGem === null) {
+                selectedGem = { r, c, element: clickedGem };
+                clickedGem.classList.add('selected');
+            } else {
+                const r2 = selectedGem.r;
+                const c2 = selectedGem.c;
+                if (Math.abs(r - r2) + Math.abs(c - c2) === 1) {
+                    swapGems(r, c, r2, c2);
+                    selectedGem.element.classList.remove('selected');
+                    selectedGem = null;
+                } else {
+                    selectedGem.element.classList.remove('selected');
+                    if (r === r2 && c === c2) {
+                        selectedGem = null;
+                    } else {
+                        selectedGem = { r, c, element: clickedGem };
+                        clickedGem.classList.add('selected');
+                    }
+                }
+            }
+        }
+
+        function swapGems(r1, c1, r2, c2) {
+            isProcessing = true;
+            [board[r1][c1], board[r2][c2]] = [board[r2][c2], board[r1][c1]];
+            if (findMatches().length > 0) {
+                setTimeout(() => {
+                    drawBoard();
+                    processBoard();
+                }, 100);
+            } else {
+                [board[r1][c1], board[r2][c2]] = [board[r2][c2], board[r1][c1]];
+                drawBoard();
+                isProcessing = false;
+            }
+        }
+
+        function findMatches() {
+            const matches = [];
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE - 2; c++) {
+                    const type = board[r][c];
+                    if (type !== null && board[r][c+1] === type && board[r][c+2] === type) {
+                        let currentC = c;
+                        while (currentC < GRID_SIZE && board[r][currentC] === type) {
+                            matches.push({ r, c: currentC });
+                            currentC++;
+                        }
+                        c = currentC - 1;
+                    }
+                }
+            }
+            for (let c = 0; c < GRID_SIZE; c++) {
+                for (let r = 0; r < GRID_SIZE - 2; r++) {
+                    const type = board[r][c];
+                    if (type !== null && board[r+1][c] === type && board[r+2][c] === type) {
+                        let currentR = r;
+                        while (currentR < GRID_SIZE && board[currentR][c] === type) {
+                            matches.push({ r: currentR, c });
+                            currentR++;
+                        }
+                        r = currentR - 1;
+                    }
+                }
+            }
+            const uniqueMatches = [];
+            const matchSet = new Set();
+            for (const match of matches) {
+                const key = `${match.r}-${match.c}`;
+                if (!matchSet.has(key)) {
+                    matchSet.add(key);
+                    uniqueMatches.push(match);
+                }
+            }
+            return uniqueMatches;
+        }
+
+        function removeMatches(matches) {
+            if (matches.length === 0) return 0;
+            for (const { r, c } of matches) {
+                board[r][c] = null;
+            }
+            score += matches.length * 10;
+            scoreElement.textContent = score;
+            return matches.length;
+        }
+
+        function dropGems() {
+            for (let c = 0; c < GRID_SIZE; c++) {
+                let emptyRow = GRID_SIZE - 1;
+                for (let r = GRID_SIZE - 1; r >= 0; r--) {
+                    if (board[r][c] !== null) {
+                        if (r !== emptyRow) {
+                            board[emptyRow][c] = board[r][c];
+                            board[r][c] = null;
+                        }
+                        emptyRow--;
+                    }
+                }
+            }
+        }
+
+        function fillBoard() {
+            for (let c = 0; c < GRID_SIZE; c++) {
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    if (board[r][c] === null) {
+                        board[r][c] = getRandomGem();
+                    }
+                }
+            }
+        }
+
+        async function processBoard() {
+            isProcessing = true;
+            let matchesFound;
+            do {
+                const matches = findMatches();
+                matchesFound = matches.length;
+                if (matchesFound > 0) {
+                    removeMatches(matches);
+                    drawBoard();
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    dropGems();
+                    fillBoard();
+                    drawBoard();
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+            } while (matchesFound > 0);
+            isProcessing = false;
+        }
+
+        createBoard();
+        drawBoard();
+        processBoard();
+    </script>
+</body>
+</html>
